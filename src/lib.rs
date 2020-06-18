@@ -1,15 +1,23 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use near_sdk::{env, near_bindgen, AccountId};
 use near_sdk::collections::UnorderedMap;
+use near_sdk::{env, near_bindgen, AccountId};
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+#[derive(BorshDeserialize)]
+pub struct PrevStatusMessage {
+    owner_id: AccountId,
+    records: UnorderedMap<String, String>,
+}
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct StatusMessage {
     owner_id: AccountId,
     records: UnorderedMap<String, String>,
+    num_records: UnorderedMap<String, u64>,
+    last_record: String,
 }
 
 impl Default for StatusMessage {
@@ -21,8 +29,25 @@ impl Default for StatusMessage {
 #[near_bindgen]
 impl StatusMessage {
     #[init]
+    pub fn migrate() -> Self {
+        let old_state: PrevStatusMessage = env::state_read().expect("Not initialized");
+        Self {
+            owner_id: old_state.owner_id,
+            records: old_state.records,
+            num_records: UnorderedMap::new(b"n".to_vec()),
+            last_record: String::new(),
+        }
+    }
+
+    #[init]
     pub fn new(owner_id: AccountId) -> Self {
-        Self { owner_id, records: UnorderedMap::new(b"r".to_vec() ) }
+        assert!(!env::state_exists(), "Already initialized");
+        Self {
+            owner_id,
+            records: UnorderedMap::new(b"r".to_vec()),
+            num_records: UnorderedMap::new(b"n".to_vec()),
+            last_record: String::new(),
+        }
     }
 
     pub fn set_status(&mut self, message: String) {
