@@ -1,26 +1,36 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use near_sdk::{env, near_bindgen};
+use near_sdk::{env, near_bindgen, AccountId};
 use near_sdk::collections::UnorderedMap;
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[near_bindgen]
-#[derive(Default, BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct StatusMessage {
+    owner_id: AccountId,
     records: UnorderedMap<String, String>,
+}
+
+impl Default for StatusMessage {
+    fn default() -> Self {
+        env::panic(b"Not initialized");
+    }
 }
 
 #[near_bindgen]
 impl StatusMessage {
+    #[init]
+    pub fn new(owner_id: AccountId) -> Self {
+        Self { owner_id, records: UnorderedMap::new(b"r".to_vec() ) }
+    }
+
     pub fn set_status(&mut self, message: String) {
-        env::log(b"A");
-        let account_id = env::signer_account_id();
+        let account_id = env::predecessor_account_id();
         self.records.insert(&account_id, &message);
     }
 
     pub fn get_status(&self, account_id: String) -> Option<String> {
-        env::log(b"A");
         return self.records.get(&account_id);
     }
 }
@@ -37,7 +47,7 @@ mod tests {
             current_account_id: "alice_near".to_string(),
             signer_account_id: "bob_near".to_string(),
             signer_account_pk: vec![0, 1, 2],
-            predecessor_account_id: "carol_near".to_string(),
+            predecessor_account_id: "bob_near".to_string(),
             input,
             block_index: 0,
             block_timestamp: 0,
@@ -57,7 +67,7 @@ mod tests {
     fn set_get_message() {
         let context = get_context(vec![], false);
         testing_env!(context);
-        let mut contract = StatusMessage::default();
+        let mut contract = StatusMessage::new("bob.near".to_string());
         contract.set_status("hello".to_string());
         assert_eq!(
             "hello".to_string(),
@@ -69,7 +79,7 @@ mod tests {
     fn get_nonexistent_message() {
         let context = get_context(vec![], true);
         testing_env!(context);
-        let contract = StatusMessage::default();
+        let contract = StatusMessage::new("bob.near".to_string());
         assert_eq!(None, contract.get_status("francis.near".to_string()));
     }
 }
